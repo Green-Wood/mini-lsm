@@ -21,14 +21,9 @@ pub trait StorageIterator {
     where
         Self: 'a;
 
-    /// Get the current value.
-    fn value(&self) -> &[u8];
-
-    /// Get the current key.
-    fn key(&self) -> Self::KeyType<'_>;
-
-    /// Check if the current iterator is valid.
-    fn is_valid(&self) -> bool;
+    /// Peek the current `(key, value)` pair. Returns `None` when the iterator is
+    /// invalid.
+    fn peek(&self) -> Option<(Self::KeyType<'_>, &[u8])>;
 
     /// Move to the next position.
     fn next(&mut self) -> anyhow::Result<()>;

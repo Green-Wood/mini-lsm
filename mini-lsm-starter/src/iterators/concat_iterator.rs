@@ -46,18 +46,9 @@ impl SstConcatIterator {
 impl StorageIterator for SstConcatIterator {
     type KeyType<'a> = KeySlice<'a>;
 
-    fn key(&self) -> KeySlice<'_> {
+    fn peek(&self) -> Option<(KeySlice<'_>, &[u8])> {
         unimplemented!()
     }
-
-    fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn is_valid(&self) -> bool {
-        unimplemented!()
-    }
-
     fn next(&mut self) -> Result<()> {
         unimplemented!()
     }

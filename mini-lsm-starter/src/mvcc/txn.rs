@@ -85,16 +85,7 @@ pub struct TxnLocalIterator {
 
 impl StorageIterator for TxnLocalIterator {
     type KeyType<'a> = &'a [u8];
-
-    fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn key(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn is_valid(&self) -> bool {
+    fn peek(&self) -> Option<(&[u8], &[u8])> {
         unimplemented!()
     }
 
@@ -123,20 +114,12 @@ impl StorageIterator for TxnIterator {
     where
         Self: 'a;
 
-    fn value(&self) -> &[u8] {
-        self.iter.value()
-    }
-
-    fn key(&self) -> Self::KeyType<'_> {
-        self.iter.key()
-    }
-
-    fn is_valid(&self) -> bool {
-        self.iter.is_valid()
+    fn peek(&self) -> Option<(Self::KeyType<'_>, &[u8])> {
+        self.iter.peek()
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        self.iter.next()
     }
 
     fn num_active_iterators(&self) -> usize {

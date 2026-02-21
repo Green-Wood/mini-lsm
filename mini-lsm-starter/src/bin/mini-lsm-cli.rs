@@ -89,12 +89,10 @@ impl ReplHandler {
                         .lsm
                         .scan(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded)?;
                     let mut cnt = 0;
-                    while iter.is_valid() {
-                        println!(
-                            "{:?}={:?}",
-                            Bytes::copy_from_slice(iter.key()),
-                            Bytes::copy_from_slice(iter.value()),
-                        );
+                    while let Some((k, v)) = iter.peek() {
+                        let k = Bytes::copy_from_slice(k);
+                        let v = Bytes::copy_from_slice(v);
+                        println!("{:?}={:?}", k, v);
                         iter.next()?;
                         cnt += 1;
                     }
@@ -107,12 +105,10 @@ impl ReplHandler {
                         std::ops::Bound::Included(end.as_bytes()),
                     )?;
                     let mut cnt = 0;
-                    while iter.is_valid() {
-                        println!(
-                            "{:?}={:?}",
-                            Bytes::copy_from_slice(iter.key()),
-                            Bytes::copy_from_slice(iter.value()),
-                        );
+                    while let Some((k, v)) = iter.peek() {
+                        let k = Bytes::copy_from_slice(k);
+                        let v = Bytes::copy_from_slice(v);
+                        println!("{:?}={:?}", k, v);
                         iter.next()?;
                         cnt += 1;
                     }

@@ -15,7 +15,7 @@
 #![allow(unused_variables)] // TODO(you): remove this lint after implementing this mod
 #![allow(dead_code)] // TODO(you): remove this lint after implementing this mod
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 use crate::{
     iterators::{StorageIterator, merge_iterator::MergeIterator},
@@ -30,7 +30,10 @@ pub struct LsmIterator {
 }
 
 impl LsmIterator {
-    pub(crate) fn new(iter: LsmIteratorInner) -> Result<Self> {
+    pub(crate) fn new(mut iter: LsmIteratorInner) -> Result<Self> {
+        while let Some((_, [])) = iter.peek() {
+            iter.next()?;
+        }
         Ok(Self { inner: iter })
     }
 }
@@ -38,20 +41,17 @@ impl LsmIterator {
 impl StorageIterator for LsmIterator {
     type KeyType<'a> = &'a [u8];
 
-    fn is_valid(&self) -> bool {
-        unimplemented!()
-    }
-
-    fn key(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn value(&self) -> &[u8] {
-        unimplemented!()
+    fn peek(&self) -> Option<(&[u8], &[u8])> {
+        let (k, v) = self.inner.peek()?;
+        Some((k.raw_ref(), v))
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        self.inner.next()?;
+        while let Some((_, [])) = self.inner.peek() {
+            self.inner.next()?;
+        }
+        Ok(())
     }
 }
 
@@ -77,20 +77,21 @@ impl<I: StorageIterator> StorageIterator for FusedIterator<I> {
         = I::KeyType<'a>
     where
         Self: 'a;
-
-    fn is_valid(&self) -> bool {
-        unimplemented!()
-    }
-
-    fn key(&self) -> Self::KeyType<'_> {
-        unimplemented!()
-    }
-
-    fn value(&self) -> &[u8] {
-        unimplemented!()
+    fn peek(&self) -> Option<(Self::KeyType<'_>, &[u8])> {
+        if self.has_errored {
+            return None;
+        }
+        self.iter.peek()
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        if self.has_errored {
+            bail!("Can't call next on a failed iterator")
+        }
+        let result = self.iter.next();
+        if result.is_err() {
+            self.has_errored = true;
+        }
+        result
     }
 }

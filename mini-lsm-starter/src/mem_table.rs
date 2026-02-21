@@ -26,7 +26,7 @@ use crossbeam_skiplist::SkipMap;
 use ouroboros::self_referencing;
 
 use crate::iterators::StorageIterator;
-use crate::key::KeySlice;
+use crate::key::{Key, KeySlice};
 use crate::table::SsTableBuilder;
 use crate::wal::Wal;
 
@@ -127,8 +127,18 @@ impl MemTable {
     }
 
     /// Get an iterator over a range of keys.
-    pub fn scan(&self, _lower: Bound<&[u8]>, _upper: Bound<&[u8]>) -> MemTableIterator {
-        unimplemented!()
+    pub fn scan(&self, lower: Bound<&[u8]>, upper: Bound<&[u8]>) -> MemTableIterator {
+        let mut it = MemTableIterator::new(
+            self.map.clone(),
+            |map| {
+                let lower = map_bound(lower);
+                let upper = map_bound(upper);
+                map.range((lower, upper))
+            },
+            None,
+        );
+        let _ = it.next();
+        it
     }
 
     /// Flush the mem-table to SSTable. Implement in week 1 day 6.
@@ -167,25 +177,20 @@ pub struct MemTableIterator {
     #[not_covariant]
     iter: SkipMapRangeIter<'this>,
     /// Stores the current key-value pair.
-    item: (Bytes, Bytes),
+    item: Option<(Bytes, Bytes)>,
 }
 
 impl StorageIterator for MemTableIterator {
     type KeyType<'a> = KeySlice<'a>;
 
-    fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn key(&self) -> KeySlice<'_> {
-        unimplemented!()
-    }
-
-    fn is_valid(&self) -> bool {
-        unimplemented!()
+    fn peek(&self) -> Option<(KeySlice<'_>, &[u8])> {
+        self.with_item(|item| item.as_ref().map(|(k, v)| (Key::from_slice(k), v.as_ref())))
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        let new_item =
+            self.with_iter_mut(|it| it.next().map(|e| (e.key().clone(), e.value().clone())));
+        self.with_item_mut(|item| *item = new_item);
+        Ok(())
     }
 }

@@ -37,43 +37,61 @@ fn test_task1_memtable_iter() {
 
     {
         let mut iter = memtable.for_testing_scan_slice(Bound::Unbounded, Bound::Unbounded);
-        assert_eq!(iter.key().for_testing_key_ref(), b"key1");
-        assert_eq!(iter.value(), b"value1");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key1"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value1");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert_eq!(iter.key().for_testing_key_ref(), b"key2");
-        assert_eq!(iter.value(), b"value2");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key2"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value2");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert_eq!(iter.key().for_testing_key_ref(), b"key3");
-        assert_eq!(iter.value(), b"value3");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key3"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value3");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
 
     {
         let mut iter =
             memtable.for_testing_scan_slice(Bound::Included(b"key1"), Bound::Included(b"key2"));
-        assert_eq!(iter.key().for_testing_key_ref(), b"key1");
-        assert_eq!(iter.value(), b"value1");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key1"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value1");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert_eq!(iter.key().for_testing_key_ref(), b"key2");
-        assert_eq!(iter.value(), b"value2");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key2"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value2");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
 
     {
         let mut iter =
             memtable.for_testing_scan_slice(Bound::Excluded(b"key1"), Bound::Excluded(b"key3"));
-        assert_eq!(iter.key().for_testing_key_ref(), b"key2");
-        assert_eq!(iter.value(), b"value2");
-        assert!(iter.is_valid());
+        assert_eq!(
+            iter.peek().expect("invalid").0.for_testing_key_ref(),
+            b"key2"
+        );
+        assert_eq!(iter.peek().expect("invalid").1, b"value2");
+        assert!(iter.peek().is_some());
         iter.next().unwrap();
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
 }
 
@@ -84,16 +102,16 @@ fn test_task1_empty_memtable_iter() {
     {
         let iter =
             memtable.for_testing_scan_slice(Bound::Excluded(b"key1"), Bound::Excluded(b"key3"));
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
     {
         let iter =
             memtable.for_testing_scan_slice(Bound::Included(b"key1"), Bound::Included(b"key2"));
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
     {
         let iter = memtable.for_testing_scan_slice(Bound::Unbounded, Bound::Unbounded);
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
 }
 
@@ -256,11 +274,11 @@ fn test_task2_merge_error() {
 fn test_task3_fused_iterator() {
     let iter = MockIterator::new(vec![]);
     let mut fused_iter = FusedIterator::new(iter);
-    assert!(!fused_iter.is_valid());
+    assert!(fused_iter.peek().is_none());
     fused_iter.next().unwrap();
     fused_iter.next().unwrap();
     fused_iter.next().unwrap();
-    assert!(!fused_iter.is_valid());
+    assert!(fused_iter.peek().is_none());
 
     let iter = MockIterator::new_with_error(
         vec![
@@ -270,9 +288,9 @@ fn test_task3_fused_iterator() {
         1,
     );
     let mut fused_iter = FusedIterator::new(iter);
-    assert!(fused_iter.is_valid());
+    assert!(fused_iter.peek().is_some());
     assert!(fused_iter.next().is_err());
-    assert!(!fused_iter.is_valid());
+    assert!(fused_iter.peek().is_none());
     assert!(fused_iter.next().is_err());
     assert!(fused_iter.next().is_err());
 }
@@ -308,11 +326,11 @@ fn test_task4_integration() {
                 (Bytes::from_static(b"4"), Bytes::from_static(b"23333")),
             ],
         );
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
         iter.next().unwrap();
         iter.next().unwrap();
         iter.next().unwrap();
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
     {
         let mut iter = storage
@@ -322,10 +340,10 @@ fn test_task4_integration() {
             &mut iter,
             vec![(Bytes::from_static(b"3"), Bytes::from_static(b"233333"))],
         );
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
         iter.next().unwrap();
         iter.next().unwrap();
         iter.next().unwrap();
-        assert!(!iter.is_valid());
+        assert!(iter.peek().is_none());
     }
 }

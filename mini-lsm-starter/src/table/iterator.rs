@@ -56,18 +56,8 @@ impl SsTableIterator {
 impl StorageIterator for SsTableIterator {
     type KeyType<'a> = KeySlice<'a>;
 
-    /// Return the `key` that's held by the underlying block iterator.
-    fn key(&self) -> KeySlice<'_> {
-        unimplemented!()
-    }
-
-    /// Return the `value` that's held by the underlying block iterator.
-    fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    /// Return whether the current block iterator is valid or not.
-    fn is_valid(&self) -> bool {
+    /// Return the current `(key, value)` pair held by the underlying block iterator.
+    fn peek(&self) -> Option<(KeySlice<'_>, &[u8])> {
         unimplemented!()
     }
 

@@ -43,19 +43,9 @@ impl<
 > StorageIterator for TwoMergeIterator<A, B>
 {
     type KeyType<'a> = A::KeyType<'a>;
-
-    fn key(&self) -> Self::KeyType<'_> {
+    fn peek(&self) -> Option<(Self::KeyType<'_>, &[u8])> {
         unimplemented!()
     }
-
-    fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    fn is_valid(&self) -> bool {
-        unimplemented!()
-    }
-
     fn next(&mut self) -> Result<()> {
         unimplemented!()
     }

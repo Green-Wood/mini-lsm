@@ -73,31 +73,20 @@ impl StorageIterator for MockIterator {
         Ok(())
     }
 
-    fn key(&self) -> KeySlice<'_> {
+    fn peek(&self) -> Option<(KeySlice<'_>, &[u8])> {
         if let Some(error_when) = self.error_when
             && self.index >= error_when
         {
             panic!("invalid access after next returns an error!");
         }
-        KeySlice::for_testing_from_slice_no_ts(self.data[self.index].0.as_ref())
-    }
-
-    fn value(&self) -> &[u8] {
-        if let Some(error_when) = self.error_when
-            && self.index >= error_when
-        {
-            panic!("invalid access after next returns an error!");
+        if self.index < self.data.len() {
+            Some((
+                KeySlice::for_testing_from_slice_no_ts(self.data[self.index].0.as_ref()),
+                self.data[self.index].1.as_ref(),
+            ))
+        } else {
+            None
         }
-        self.data[self.index].1.as_ref()
-    }
-
-    fn is_valid(&self) -> bool {
-        if let Some(error_when) = self.error_when
-            && self.index >= error_when
-        {
-            panic!("invalid access after next returns an error!");
-        }
-        self.index < self.data.len()
     }
 }
 
@@ -110,25 +99,33 @@ where
     I: for<'a> StorageIterator<KeyType<'a> = KeySlice<'a>>,
 {
     for (k, v) in expected {
-        assert!(iter.is_valid());
+        assert!(iter.peek().is_some());
         assert_eq!(
             k,
-            iter.key().for_testing_key_ref(),
+            iter.peek()
+                .expect("invalid iterator")
+                .0
+                .for_testing_key_ref(),
             "expected key: {:?}, actual key: {:?}",
             k,
-            as_bytes(iter.key().for_testing_key_ref()),
+            as_bytes(
+                iter.peek()
+                    .expect("invalid iterator")
+                    .0
+                    .for_testing_key_ref()
+            ),
         );
         assert_eq!(
             v,
-            iter.value(),
+            iter.peek().expect("invalid iterator").1,
             "expected value: {:?}, actual value: {:?}",
             v,
-            as_bytes(iter.value()),
+            as_bytes(iter.peek().expect("invalid iterator").1),
         );
         iter.next().unwrap();
     }
     assert!(
-        !iter.is_valid(),
+        iter.peek().is_none(),
         "iterator should not be valid at the end of the check"
     );
 }
@@ -138,29 +135,27 @@ where
     I: for<'a> StorageIterator<KeyType<'a> = KeySlice<'a>>,
 {
     for ((k, ts), v) in expected {
-        assert!(iter.is_valid());
+        assert!(iter.peek().is_some());
+        let cur = iter.peek().expect("invalid iterator");
         assert_eq!(
             (&k[..], ts),
-            (
-                iter.key().for_testing_key_ref(),
-                iter.key().for_testing_ts()
-            ),
+            (cur.0.for_testing_key_ref(), cur.0.for_testing_ts()),
             "expected key: {:?}@{}, actual key: {:?}@{}",
             k,
             ts,
-            as_bytes(iter.key().for_testing_key_ref()),
-            iter.key().for_testing_ts(),
+            as_bytes(cur.0.for_testing_key_ref()),
+            cur.0.for_testing_ts(),
         );
         assert_eq!(
             v,
-            iter.value(),
+            cur.1,
             "expected value: {:?}, actual value: {:?}",
             v,
-            as_bytes(iter.value()),
+            as_bytes(cur.1),
         );
         iter.next().unwrap();
     }
-    assert!(!iter.is_valid());
+    assert!(iter.peek().is_none());
 }
 
 pub fn check_lsm_iter_result_by_key<I>(iter: &mut I, expected: Vec<(Bytes, Bytes)>)
@@ -168,30 +163,31 @@ where
     I: for<'a> StorageIterator<KeyType<'a> = &'a [u8]>,
 {
     for (k, v) in expected {
-        assert!(iter.is_valid());
+        assert!(iter.peek().is_some());
+        let cur = iter.peek().expect("invalid iterator");
         assert_eq!(
             k,
-            iter.key(),
+            cur.0,
             "expected key: {:?}, actual key: {:?}",
             k,
-            as_bytes(iter.key()),
+            as_bytes(cur.0),
         );
         assert_eq!(
             v,
-            iter.value(),
+            cur.1,
             "expected value: {:?}, actual value: {:?}",
             v,
-            as_bytes(iter.value()),
+            as_bytes(cur.1),
         );
         iter.next().unwrap();
     }
-    assert!(!iter.is_valid());
+    assert!(iter.peek().is_none());
 }
 
 pub fn expect_iter_error(mut iter: impl StorageIterator) {
     loop {
         match iter.next() {
-            Ok(_) if iter.is_valid() => continue,
+            Ok(_) if iter.peek().is_some() => continue,
             Ok(_) => panic!("expect an error"),
             Err(_) => break,
         }
