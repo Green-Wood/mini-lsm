@@ -18,6 +18,7 @@
 use crate::key::{KeySlice, KeyVec};
 
 use super::Block;
+use bytes::BufMut;
 
 /// Builds a block.
 pub struct BlockBuilder {
@@ -34,23 +35,53 @@ pub struct BlockBuilder {
 impl BlockBuilder {
     /// Creates a new block builder.
     pub fn new(block_size: usize) -> Self {
-        unimplemented!()
+        BlockBuilder {
+            offsets: Vec::new(),
+            data: Vec::new(),
+            block_size,
+            first_key: KeyVec::new(),
+        }
     }
 
     /// Adds a key-value pair to the block. Returns false when the block is full.
     /// You may find the `bytes::BufMut` trait useful for manipulating binary data.
     #[must_use]
     pub fn add(&mut self, key: KeySlice, value: &[u8]) -> bool {
-        unimplemented!()
+        // Check if block is full
+        let size_after_add =
+            self.data.len() + self.offsets.len() * 2 + 2 + key.len() + 2 + value.len() + 2;
+        if !self.is_empty() && size_after_add > self.block_size {
+            return false;
+        }
+
+        let entry_start = self.data.len() as u16;
+
+        // Serialize key length, key, value length, value
+        self.data.put_u16_le(key.len() as u16);
+        self.data.extend_from_slice(key.raw_ref());
+        self.data.put_u16_le(value.len() as u16);
+        self.data.extend_from_slice(value);
+
+        self.offsets.push(entry_start);
+
+        // Set first_key if this is the first entry
+        if self.offsets.len() == 1 {
+            self.first_key.set_from_slice(key);
+        }
+
+        true
     }
 
     /// Check if there is no key-value pair in the block.
     pub fn is_empty(&self) -> bool {
-        unimplemented!()
+        self.offsets.is_empty()
     }
 
     /// Finalize the block.
     pub fn build(self) -> Block {
-        unimplemented!()
+        Block {
+            data: self.data,
+            offsets: self.offsets,
+        }
     }
 }

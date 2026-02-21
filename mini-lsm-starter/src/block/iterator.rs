@@ -17,7 +17,10 @@
 
 use std::sync::Arc;
 
-use crate::key::{KeySlice, KeyVec};
+use crate::{
+    iterators::StorageIterator,
+    key::{KeySlice, KeyVec},
+};
 
 use super::Block;
 
@@ -25,10 +28,8 @@ use super::Block;
 pub struct BlockIterator {
     /// The internal `Block`, wrapped by an `Arc`
     block: Arc<Block>,
-    /// The current key, empty represents the iterator is invalid
-    key: KeyVec,
-    /// the current value range in the block.data, corresponds to the current key
-    value_range: (usize, usize),
+    /// The current entry (key and value range), or None if iterator is invalid/exhausted
+    current: Option<(KeyVec, (usize, usize))>,
     /// Current index of the key-value pair, should be in range of [0, num_of_elements)
     idx: usize,
     /// The first key in the block
@@ -39,8 +40,7 @@ impl BlockIterator {
     fn new(block: Arc<Block>) -> Self {
         Self {
             block,
-            key: KeyVec::new(),
-            value_range: (0, 0),
+            current: None,
             idx: 0,
             first_key: KeyVec::new(),
         }
@@ -48,44 +48,90 @@ impl BlockIterator {
 
     /// Creates a block iterator and seek to the first entry.
     pub fn create_and_seek_to_first(block: Arc<Block>) -> Self {
-        unimplemented!()
+        let mut iter = Self::new(block.clone());
+        iter.seek_to_first();
+        iter
     }
 
     /// Creates a block iterator and seek to the first key that >= `key`.
     pub fn create_and_seek_to_key(block: Arc<Block>, key: KeySlice) -> Self {
-        unimplemented!()
-    }
-
-    /// Returns the key of the current entry.
-    pub fn key(&self) -> KeySlice<'_> {
-        unimplemented!()
-    }
-
-    /// Returns the value of the current entry.
-    pub fn value(&self) -> &[u8] {
-        unimplemented!()
-    }
-
-    /// Returns true if the iterator is valid.
-    /// Note: You may want to make use of `key`
-    pub fn is_valid(&self) -> bool {
-        unimplemented!()
+        let mut iter = Self::new(block.clone());
+        iter.seek_to_key(key);
+        iter
     }
 
     /// Seeks to the first key in the block.
     pub fn seek_to_first(&mut self) {
-        unimplemented!()
-    }
-
-    /// Move to the next key in the block.
-    pub fn next(&mut self) {
-        unimplemented!()
+        self.idx = 0;
+        self.update_current();
     }
 
     /// Seek to the first key that >= `key`.
     /// Note: You should assume the key-value pairs in the block are sorted when being added by
     /// callers.
     pub fn seek_to_key(&mut self, key: KeySlice) {
-        unimplemented!()
+        let mut found = false;
+        for i in 0..self.block.offsets.len() {
+            let (k_bytes, _) = Self::parse_entry(&self.block.data, self.block.offsets[i] as usize);
+            if k_bytes >= key.raw_ref() {
+                self.idx = i;
+                found = true;
+                break;
+            }
+        }
+        if found {
+            self.update_current();
+        } else {
+            self.idx = self.block.offsets.len(); // invalid
+            self.current = None;
+        }
+    }
+    fn update_current(&mut self) {
+        if self.idx < self.block.offsets.len() {
+            let (k_bytes, v_range) =
+                Self::parse_entry(&self.block.data, self.block.offsets[self.idx] as usize);
+            let key = KeyVec::from_vec(k_bytes.to_vec());
+            self.current = Some((key, v_range));
+        } else {
+            self.current = None;
+        }
+    }
+
+    fn parse_entry(data: &[u8], offset: usize) -> (&[u8], (usize, usize)) {
+        let mut pos = offset;
+        let key_len = u16::from_le_bytes([data[pos], data[pos + 1]]) as usize;
+        pos += 2;
+        let key = &data[pos..pos + key_len];
+        pos += key_len;
+        let value_len = u16::from_le_bytes([data[pos], data[pos + 1]]) as usize;
+        pos += 2;
+        let value_range = (pos, pos + value_len);
+        (key, value_range)
+    }
+}
+
+impl StorageIterator for BlockIterator {
+    type KeyType<'a>
+        = KeySlice<'a>
+    where
+        Self: 'a;
+
+    fn peek(&self) -> Option<(Self::KeyType<'_>, &[u8])> {
+        if let Some((key, (start, end))) = &self.current {
+            let key_slice = key.as_key_slice();
+            let value = &self.block.data[*start..*end];
+            Some((key_slice, value))
+        } else {
+            None
+        }
+    }
+
+    /// Move to the next key in the block.
+    fn next(&mut self) -> anyhow::Result<()> {
+        if self.idx < self.block.offsets.len() {
+            self.idx += 1;
+            self.update_current();
+        }
+        Ok(())
     }
 }
